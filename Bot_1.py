@@ -1,18 +1,26 @@
 import telebot as tb
 import os
 import fitz
+import json
+
 
 f = open('token.txt')
 bot = tb.TeleBot(f.read())
+f.close()
 tb.apihelper.proxy = {'https': 'socks5://14611055481:U777Vluhz8@orbtl.s5.opennetwork.cc:999'}
 files = []
-
+f = open('access.txt', 'r')
+acl = json.load(f)
+print(acl)
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_worker(call):
-    global files
-    print(call.data)
-    print(call.data[4:])
+    global files, acl
+
+    if not(call.message.chat.id in acl):
+        bot.send_message(call.message.chat.id, 'Ошибка доуступа')
+        return
+
     keyboard = tb.types.InlineKeyboardMarkup()
     bot.delete_message(call.message.chat.id, call.message.message_id)
     if call.data.startswith('page'):
@@ -34,7 +42,14 @@ def callback_worker(call):
 
 @bot.message_handler(commands=['start'])
 def start_message(message):
-    global files
+    global files, acl
+
+    print(message.chat.id)
+
+    if not(message.chat.id in acl):
+        bot.send_message(message.chat.id, 'Ошибка доуступа')
+        return
+
     keyboard = tb.types.InlineKeyboardMarkup()
     files = os.listdir('./pass')
     if len(files) < 6:
