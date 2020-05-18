@@ -40,14 +40,18 @@ def callback_worker(call):
         if page == 0:
             for name in files[0:page_size]:
                 keyboard.add(tb.types.InlineKeyboardButton(text=name[7:-4], callback_data=name[7:40]))
-            keyboard.add(tb.types.InlineKeyboardButton(text='>>', callback_data='!'+str(page_size)+str(page+1)+' '+mask))
+            keyboard.add(tb.types.InlineKeyboardButton(text='>>',
+                                                       callback_data='!'+str(page_size)+str(page+1)+' '+mask))
         else:
-            keyboard.add(tb.types.InlineKeyboardButton(text='<<', callback_data='!'+str(page_size)+str(page-1)+' '+mask))
+            keyboard.add(tb.types.InlineKeyboardButton(text='<<',
+                                                       callback_data='!'+str(page_size)+str(page-1)+' '+mask))
             for name in files[page*page_size+0:page*page_size+page_size]:
                 keyboard.add(tb.types.InlineKeyboardButton(text=name[7:-4], callback_data=name[7:40]))
             if len(files)-(page*page_size) > page_size:
-                keyboard.add(tb.types.InlineKeyboardButton(text='>>', callback_data='!'+str(page_size)+str(page+1)+' '+mask))
-        bot.send_message(call.message.chat.id, 'список', reply_markup=keyboard)
+                keyboard.add(tb.types.InlineKeyboardButton(text='>>',
+                                                           callback_data='!'+str(page_size)+str(page+1)+' '+mask))
+        bot.send_message(call.message.chat.id,
+                         'Cтраница '+str(page+1)+' из '+str(len(files)//page_size), reply_markup=keyboard)
     else:
         bot.send_message(call.message.chat.id, xps(call.data))
 
@@ -74,8 +78,6 @@ def text_message(message):
     else:
         page_size = int(message.text[6])
         mask = message.text[8:]
-    print(mask)
-    print(page_size)
 
     if not(message.chat.id in acl):
         bot.send_message(message.chat.id, 'Ошибка доступа')
@@ -92,7 +94,7 @@ def text_message(message):
             keyboard.add(tb.types.InlineKeyboardButton(text=name[7:-4], callback_data=name[7:40]))
         keyboard.add(tb.types.InlineKeyboardButton(text='>>', callback_data='!'+str(page_size)+'1 '+mask))
 
-    bot.send_message(message.chat.id, 'список', reply_markup=keyboard)
+    bot.send_message(message.chat.id, 'Найдено узлов '+str(len(files)), reply_markup=keyboard)
 
 
 def xps(filemask):
