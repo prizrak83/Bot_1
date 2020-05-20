@@ -2,7 +2,7 @@ import telebot as tb
 import glob
 import fitz
 import json
-
+import configparser
 
 HELP_TEXT = 'Для запроса пароля узла введите \n /list <колличество строк на странице> <имя узла> \n' \
             'колличество строк задётся в интервале от 5 до 9, если не задано то равно 5\n' \
@@ -12,15 +12,21 @@ ADMIN_HELP_TEXT = '/acl_list - список пользователей\n/acl_err
                   '/acl_del <id пользователя> - удаление пользователяиз списка доступа\n' \
                   '/acl_save  - сохранение текущего списка доступа в файл'
 
-ACL_FILE = 'access2.txt'
-ADMIN_INDEX = 0
-f = open('token.txt')
+config = configparser.ConfigParser()
+config.read('config.ini')
+acl_file = config.get('Settings', 'acl_file')
+token_file = config.get('Settings', 'token_file')
+proxy_type = config.get('Settings', 'proxy_type')
+proxy_address = config.get('Settings', 'proxy_address')
+admin_index = int(config.get('Settings', 'admin_index'))
+
+f = open(token_file)
 bot = tb.TeleBot(f.read())
 f.close()
 
-tb.apihelper.proxy = {'https': 'socks5://14611055481:U777Vluhz8@orbtl.s5.opennetwork.cc:999'}
+tb.apihelper.proxy = {proxy_type: proxy_address}
 
-f = open(ACL_FILE, 'r')
+f = open(acl_file, 'r')
 acl_user = json.load(f)
 f.close()
 
@@ -77,7 +83,7 @@ def callback_worker(call):
 @bot.message_handler(commands=['acl_error'])
 def show_acl_error(message):
     global last_id_error, acl
-    if message.chat.id == acl[ADMIN_INDEX]:
+    if message.chat.id == acl[admin_index]:
         bot.send_message(message.chat.id, 'Последний не зарегестрированный пользователь'+str(last_id_error))
 
 
@@ -85,7 +91,7 @@ def show_acl_error(message):
 def add_acl(message):
     global last_id_error, acl, acl_user
     user_name = message.text[10:]
-    if message.chat.id == acl[ADMIN_INDEX]:
+    if message.chat.id == acl[admin_index]:
         if last_id_error is None:
             bot.send_message(message.chat.id, 'Отсутсвует не залогиненный пользователь')
             return
@@ -101,9 +107,9 @@ def add_acl(message):
 
 @bot.message_handler(commands=['acl_save'])
 def add_acl(message):
-    global acl, acl_user, ACL_FILE
-    if message.chat.id == acl[ADMIN_INDEX]:
-        f = open(ACL_FILE, 'w')
+    global acl, acl_user, acl_file
+    if message.chat.id == acl[admin_index]:
+        f = open(acl_file, 'w')
         json.dump(acl_user, f)
         f.close()
 
@@ -111,7 +117,7 @@ def add_acl(message):
 @bot.message_handler(commands=['acl_del'])
 def acl_delete(message):
     global acl, acl_user
-    if message.chat.id == acl[ADMIN_INDEX]:
+    if message.chat.id == acl[admin_index]:
         del_id = int(message.text[9:])
         if del_id == 0 or not(del_id in acl):
             bot.send_message(message.chat.id, 'Введён не верный id пользователя, проверьте id через команду /acl_list')
@@ -122,13 +128,14 @@ def acl_delete(message):
         i = acl.index(del_id)
         del acl[i]
         del acl_user[i]
+        bot.send_message(message.chat.id, 'Пользователь удалён')
         show_acl_list(message)
 
 
 @bot.message_handler(commands=['acl_list'])
 def show_acl_list(message):
     global last_id_error, acl, acl_user
-    if message.chat.id == acl[ADMIN_INDEX]:
+    if message.chat.id == acl[admin_index]:
         acl_list = 'Список зарегестрированных пользователей\n'
         for user_id in acl_user:
             acl_list = acl_list + str(user_id[0])+' '+user_id[1] + '\n'
@@ -139,13 +146,16 @@ def show_acl_list(message):
 def start_message(message):
     global last_id_error, acl
     print(message.chat.id)
+    get_settings()
 
     if not(message.chat.id in acl):
         last_id_error = message.chat.id
         bot.send_message(message.chat.id, 'Ошибка доступа')
         return
+
     bot.send_message(message.chat.id, HELP_TEXT)
-    if message.chat.id == acl[ADMIN_INDEX]:
+
+    if message.chat.id == acl[admin_index]:
         bot.send_message(message.chat.id, ADMIN_HELP_TEXT)
 
 
@@ -175,6 +185,7 @@ def list_message(message):
 
     if page_size < 5:
         page_size = 5
+
     if not(message.chat.id in acl):
         bot.send_message(message.chat.id, 'Ошибка доступа')
         return
@@ -201,6 +212,18 @@ def xps(filemask):
         password = password + doc.getPageText(0)
         doc.close()
     return password
+
+
+def get_settings():
+    global acl_file, token_file, proxy_type, proxy_address, admin_index
+
+    config = configparser.ConfigParser()
+    config.read('config.ini')
+    acl_file = config.get('Settings', 'acl_file')
+    token_file = config.get('Settings', 'token_file')
+    proxy_type = config.get('Settings', 'proxy_type')
+    proxy_address = config.get('Settings', 'proxy_address')
+    admin_index = int(config.get('Settings', 'admin_index'))
 
 
 bot.polling(none_stop=True, timeout=123)
