@@ -84,7 +84,10 @@ def callback_worker(call):
 def show_acl_error(message):
     global last_id_error, acl
     if message.chat.id == acl[admin_index]:
-        bot.send_message(message.chat.id, 'Последний не зарегестрированный пользователь'+str(last_id_error))
+        if last_id_error is None:
+            bot.send_message(message.chat.id, 'Отсутсвует не зарегестрированный пользователь')
+            return
+        bot.send_message(message.chat.id, 'Последний не зарегестрированный пользователь '+str(last_id_error))
 
 
 @bot.message_handler(commands=['acl_add'])
@@ -93,7 +96,7 @@ def add_acl(message):
     user_name = message.text[10:]
     if message.chat.id == acl[admin_index]:
         if last_id_error is None:
-            bot.send_message(message.chat.id, 'Отсутсвует не залогиненный пользователь')
+            bot.send_message(message.chat.id, 'Отсутсвует не зарегестрированный пользователь')
             return
         if len(user_name) == 0:
             bot.send_message(message.chat.id, 'После команды /acl_add напишите имя пользователя')
