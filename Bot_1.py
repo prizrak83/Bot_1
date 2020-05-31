@@ -3,10 +3,14 @@ import glob
 import fitz
 import json
 import configparser
+from time import sleep, time
+from multiprocessing import Process
+import sqlite3
 
 HELP_TEXT = 'Для запроса пароля узла введите \n /list <колличество строк на странице> <имя узла> \n' \
             'колличество строк задётся в интервале от 5 до 9, если не задано то равно 5\n' \
-            'Для запроса админских паролей введите команду /admin_list'
+            'Для запроса админских паролей введите команду /admin_list' \
+            'Собщение с паролем удалится через 5 минут'
 ADMIN_HELP_TEXT = '/acl_list - список пользователей\n/acl_error - последний не зарегестрированный пользователь\n' \
                   '/acl_add <имя пользователя>- добавление последнего не зарегестрированного пользовател\n' \
                   '/acl_del <id пользователя> - удаление пользователяиз списка доступа\n' \
@@ -17,12 +21,14 @@ config.read('config.ini')
 acl_file = config.get('Settings', 'acl_file')
 token_file = config.get('Settings', 'token_file')
 proxy_type = config.get('Settings', 'proxy_type')
-proxy_address = config.get('Settings', 'proxy_address')
 admin_index = int(config.get('Settings', 'admin_index'))
+config.read('proxy.ini')
+proxy_address = config.get('Settings', 'proxy_address')
 
 f = open(token_file)
 bot = tb.TeleBot(f.read())
 f.close()
+
 
 tb.apihelper.proxy = {proxy_type: proxy_address}
 
@@ -35,7 +41,6 @@ for i in range(len(acl_user)):
     acl.append(acl_user[i][0])
 
 print(acl_user)
-print(acl)
 last_id_error = None
 
 
@@ -78,6 +83,7 @@ def callback_worker(call):
                          'Cтраница '+str(page+1)+' из '+str(len(files)//page_size), reply_markup=keyboard)
     else:
         bot.send_message(call.message.chat.id, xps(call.data))
+        add_message_in_list(call.message.message_id+1, call.message.chat.id, int(time())+300)
 
 
 @bot.message_handler(commands=['acl_error'])
@@ -172,6 +178,7 @@ def admin_list(message):
 
     f = open('AdminGroupPas.txt')
     bot.send_message(message.chat.id, f.read())
+    add_message_in_list(message.message_id + 1, message.chat.id, int(time()) + 300)
     f.close()
 
 
@@ -218,15 +225,61 @@ def xps(filemask):
 
 
 def get_settings():
-    global acl_file, token_file, proxy_type, proxy_address, admin_index
+    global acl_file, admin_index
 
     config = configparser.ConfigParser()
     config.read('config.ini')
     acl_file = config.get('Settings', 'acl_file')
-    token_file = config.get('Settings', 'token_file')
-    proxy_type = config.get('Settings', 'proxy_type')
-    proxy_address = config.get('Settings', 'proxy_address')
     admin_index = int(config.get('Settings', 'admin_index'))
 
 
-bot.polling(none_stop=True, timeout=123)
+def add_message_in_list(message_id, chat_id, message_time):
+    conn = sqlite3.connect("temp.db")
+    cursor = conn.cursor()
+    entities = (message_id, chat_id, message_time)
+    cursor.execute("""INSERT INTO message_list(message_id, chat_id, message_time) VALUES(?, ?, ?) """, entities)
+    conn.commit()
+    cursor.close()
+
+
+def delete_message():
+    while True:
+        sleep_time = 300
+        conn = sqlite3.connect("temp.db")
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM message_list')
+        message_list = cursor.fetchall()
+        for message in message_list:
+            if message[3] < int(time()):
+                bot.delete_message(message[2], message[1])
+                cursor.execute('DELETE FROM message_list WHERE id =:id', {'id': message[0]})
+            elif sleep_time > message[3] - int(time()):
+                sleep_time = message[3] - int(time())
+        conn.commit()
+        cursor.close()
+        sleep(sleep_time)
+
+
+if __name__ == "__main__":
+    conn_init = sqlite3.connect("temp.db")
+    cursor_init = conn_init.cursor()
+    try:
+        cursor_init.execute("drop table message_list")
+    except Exception:
+        print(0)
+    finally:
+        cursor_init.execute("""CREATE TABLE message_list(id integer PRIMARY KEY, message_id integer,
+                                chat_id integer, message_time integer)""")
+
+    conn_init.commit()
+    cursor_init.close()
+
+    p1 = Process(target=delete_message, args=())
+    p1.start()
+
+    while True:
+        try:
+            bot.polling(none_stop=True, timeout=123)
+        except Exception as e:
+            print(e)
+            sleep(15)
