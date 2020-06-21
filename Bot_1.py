@@ -20,17 +20,18 @@ config = configparser.ConfigParser()
 config.read('config.ini')
 acl_file = config.get('Settings', 'acl_file')
 token_file = config.get('Settings', 'token_file')
-proxy_type = config.get('Settings', 'proxy_type')
 admin_index = int(config.get('Settings', 'admin_index'))
-config.read('proxy.ini')
-proxy_address = config.get('Settings', 'proxy_address')
 
 f = open(token_file)
 bot = tb.TeleBot(f.read())
 f.close()
 
 
-tb.apihelper.proxy = {proxy_type: proxy_address}
+if config.get('Settings', 'use_proxy') == 'yes':
+    config.read('proxy.ini')
+    proxy_address = config.get('Settings', 'proxy_address')
+    proxy_type = config.get('Settings', 'proxy_type')
+    tb.apihelper.proxy = {proxy_type: proxy_address}
 
 f = open(acl_file, 'r')
 acl_user = json.load(f)
